@@ -14,6 +14,12 @@ let
       addonsWithPythonPath = lib.filter (addon: addon ? pythonPath) addons;
     in
       lib.concatMapStringsSep ":" (addon: "${addon}${kodiPackages.addonDir}/${addon.namespace}/${addon.pythonPath}") addonsWithPythonPath;
+  # <<< TODO: explain >>>
+  additionalAddons =
+    let
+      addonsWithNamespace = lib.filter (addon: addon ? namespace) addons;
+    in
+      lib.concatMapStringsSep "\n" (addon: "  <addon>${addon.namespace}</addon>") addonsWithNamespace;
 in
 
 buildEnv {
@@ -41,5 +47,12 @@ buildEnv {
     # these assets instead.
     rm $out/share/kodi/addons/webinterface.default
     cp -r ${kodi}/share/kodi/addons/webinterface.default/ $out/share/kodi/addons/webinterface.default
+
+    # <<< TODO: explain >>>
+    # <<< TODO: this doesn't work right now without my custom media plugin. basically, we need something to get the symlinks further down so we can actually replace this file >>>
+    rm $out/share/kodi/system/addon-manifest.xml
+    cp ${kodi}/share/kodi/system/addon-manifest.xml $out/share/kodi/system/addon-manifest.xml
+    substituteInPlace $out/share/kodi/system/addon-manifest.xml \
+      --replace '</addons>' $'${additionalAddons}\n</addons>'
   '';
 }
