@@ -37,16 +37,17 @@ buildEnv {
       makeWrapper ${kodi}/bin/$exe $out/bin/$exe \
         --prefix PYTHONPATH : ${requiredPythonPath}:${additionalPythonPath} \
         --prefix KODI_HOME : $out/share/kodi \
+        --prefix KODI_EXTRA_FILE_WHITELIST : $out/share/kodi/addons/ \
         --prefix LD_LIBRARY_PATH ":" "${lib.makeLibraryPath
           (lib.concatMap
             (plugin: plugin.extraRuntimeDependencies or []) addons)}"
     done
 
-    # makeWrapper just created webinterface.default as a symlink. However,
-    # kodi's webserver carefully refuses to follow symlinks, so we need to copy
-    # these assets instead.
-    rm $out/share/kodi/addons/webinterface.default
-    cp -r ${kodi}/share/kodi/addons/webinterface.default/ $out/share/kodi/addons/webinterface.default
+    #<<< # makeWrapper just created webinterface.default as a symlink. However,
+    #<<< # kodi's webserver carefully refuses to follow symlinks, so we need to copy
+    #<<< # these assets instead.
+    #<<< rm $out/share/kodi/addons/webinterface.default
+    #<<< cp -r ${kodi}/share/kodi/addons/webinterface.default/ $out/share/kodi/addons/webinterface.default
 
     # <<< TODO: explain >>>
     # <<< TODO: this doesn't work right now without my custom media plugin. basically, we need something to get the symlinks further down so we can actually replace this file >>>

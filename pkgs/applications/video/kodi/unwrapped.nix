@@ -6,7 +6,7 @@
 , openssl, gperf, tinyxml2, taglib, libssh, swig, jre_headless
 , gtest, ncurses, spdlog
 , libxml2, systemd
-, alsa-lib, libGLU, libGL, fontconfig, freetype, ftgl
+, alsa-lib, libGLU, libGL, fetchpatch, fontconfig, freetype, ftgl
 , libjpeg, libpng, libtiff
 , libmpeg2, libsamplerate, libmad
 , libogg, libvorbis, flac, libxslt
@@ -106,6 +106,15 @@ in stdenv.mkDerivation {
     version = kodiVersion;
 
     src = kodi_src;
+
+    # Fix pending upstream: https://github.com/xbmc/xbmc/pull/21113
+    patches = [
+      (fetchpatch {
+        name = "add-file-whitelist.patch";
+        url = "https://github.com/jfly/xbmc/commit/fe229691af107307621620691dee43524d8355cb.patch";
+        sha256 = "Ob0y0nE0fxFalVsw5S3B2+d1wJz28PZRdD4RyS66TFw=";
+      })
+    ];
 
     buildInputs = [
       gnutls libidn libtasn1 nasm p11-kit
