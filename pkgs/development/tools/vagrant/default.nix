@@ -1,5 +1,5 @@
 { stdenv, lib, fetchurl, buildRubyGem, bundlerEnv, ruby, libarchive
-, libguestfs, qemu, writeText, withLibvirt ? stdenv.isLinux
+, libguestfs, qemu, writeText, withLibvirt ? true, withVagrantAws ? true
 }:
 
 let
@@ -17,7 +17,7 @@ let
     inherit ruby;
     gemfile = writeText "Gemfile" "";
     lockfile = writeText "Gemfile.lock" "";
-    gemset = lib.recursiveUpdate (import ./gemset.nix) ({
+    gemset = lib.recursiveUpdate (lib.recursiveUpdate (import ./gemset.nix) ({
       vagrant = {
         source = {
           type = "url";
@@ -25,7 +25,16 @@ let
         };
         inherit version;
       };
-    } // lib.optionalAttrs withLibvirt (import ./gemset_libvirt.nix));
+    } // lib.optionalAttrs withLibvirt (import ./gemset_libvirt.nix))) ({
+      vagrant = {
+        source = {
+          type = "url";
+          inherit url sha256;
+        };
+        inherit version;
+      };
+      # <<< i had to do unspeakably weird things to generate this gemset_vagrant_aws.nix file. see /home/jeremy/tmp/jfly for details, also https://github.com/nix-community/bundix/issues/88 >>>
+    } // lib.optionalAttrs withVagrantAws (import ./gemset_vagrant_aws.nix));
 
     # This replaces the gem symlinks with directories, resolving this
     # error when running vagrant (I have no idea why):
@@ -89,6 +98,11 @@ in buildRubyGem rec {
   '' +
   lib.optionalString withLibvirt ''
     substitute ${./vagrant-libvirt.json.in} $out/vagrant-plugins/plugins.d/vagrant-libvirt.json \
+      --subst-var-by ruby_version ${ruby.version} \
+      --subst-var-by vagrant_version ${version}
+  '' +
+  lib.optionalString withVagrantAws ''
+    substitute ${./vagrant-vagrant_aws.json.in} $out/vagrant-plugins/plugins.d/vagrant-vagrant-aws.json \
       --subst-var-by ruby_version ${ruby.version} \
       --subst-var-by vagrant_version ${version}
   '';
