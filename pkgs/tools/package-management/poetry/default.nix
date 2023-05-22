@@ -9,24 +9,50 @@ let
       poetry = self.callPackage ./unwrapped.nix { };
 
       # version overrides required by poetry and its plugins
+      filelock = super.filelock.overridePythonAttrs (old: rec {
+        version = "3.12.0";
+        src = self.fetchPypi {
+          inherit (old) pname;
+          inherit version;
+          hash = "sha256-/AOuQyiMAT0uqDyFlwAbESnbNRqtnFf+JAkyeRa45xg=";
+        };
+        nativeCheckInputs = with self; [
+          pytest-mock
+          pytestCheckHook
+        ];
+      });
       platformdirs = super.platformdirs.overridePythonAttrs (old: rec {
-        version = "2.6.2";
+        version = "3.5.1";
         src = fetchFromGitHub {
           owner = "platformdirs";
           repo = "platformdirs";
           rev = "refs/tags/${version}";
-          hash = "sha256-yGpDAwn8Kt6vF2K2zbAs8+fowhYQmvsm/87WJofuhME=";
+          hash = "sha256-/qi22jiF+P7XcG/D+dxoOrHk89amdBoGewrTqZZOsoM=";
         };
         SETUPTOOLS_SCM_PRETEND_VERSION = version;
       });
       poetry-core = super.poetry-core.overridePythonAttrs (old: rec {
-        version = "1.5.2";
+        version = "1.6.0";
         src = fetchFromGitHub {
           owner = "python-poetry";
           repo = "poetry-core";
           rev = version;
-          hash = "sha256-GpZ0vMByHTu5kl7KrrFFK2aZMmkNO7xOEc8NI2H9k34=";
+          hash = "sha256-WPGHMrMXXkvgHUA51g5eGFhq5pnb4ELQcTQGNIJX2vo=";
         };
+        nativeCheckInputs = old.nativeCheckInputs ++ [
+          self.tomli-w
+        ];
+      });
+      virtualenv = super.virtualenv.overridePythonAttrs (old: rec {
+        version = "20.23.0";
+        src = self.fetchPypi {
+          inherit (old) pname;
+          inherit version;
+          hash = "sha256-qFyqVUztDAr70NY45+LXtfktI0eNBdF6dtrqyPJ5+SQ=";
+        };
+        nativeCheckInputs = old.nativeCheckInputs ++ [
+          self.time-machine
+        ];
       });
     };
   };
