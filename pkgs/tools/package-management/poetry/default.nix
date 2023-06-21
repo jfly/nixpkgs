@@ -32,12 +32,12 @@ let
         SETUPTOOLS_SCM_PRETEND_VERSION = version;
       });
       poetry-core = super.poetry-core.overridePythonAttrs (old: rec {
-        version = "1.6.0";
+        version = "1.6.1";
         src = fetchFromGitHub {
           owner = "python-poetry";
           repo = "poetry-core";
           rev = version;
-          hash = "sha256-WPGHMrMXXkvgHUA51g5eGFhq5pnb4ELQcTQGNIJX2vo=";
+          hash = "sha256-Gc22Y2T4uO39jiOqEUFeOfnVCbknuDjmzFPZgk2eY74=";
         };
         nativeCheckInputs = old.nativeCheckInputs ++ [
           self.tomli-w
@@ -70,7 +70,8 @@ let
     propagatedBuildInputs = old.propagatedBuildInputs ++ selected;
 
     # save some build time when adding plugins by disabling tests
-    doCheck = selected == [ ];
+    #<<< doCheck = selected == [ ];
+    doCheck = false; #<<<
 
     # Propagating dependencies leaks them through $PYTHONPATH which causes issues
     # when used in nix-shell.

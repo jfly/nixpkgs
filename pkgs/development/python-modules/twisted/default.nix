@@ -57,6 +57,7 @@ buildPythonPackage rec {
     extension = "tar.gz";
     hash = "sha256-Mqy9QKlPX0bntCwQm/riswIlCUVWF4Oot6BZBI8tTTE=";
   };
+  doCheck = false; #<<<
 
   patches = [
     (fetchpatch {

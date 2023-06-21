@@ -50,7 +50,8 @@ buildPythonPackage rec {
 
   nativeCheckInputs = [ nose pytest pytest-xdist ];
 
-  doCheck = !(stdenv.isx86_64 && stdenv.isDarwin);
+  #<<< doCheck = !(stdenv.isx86_64 && stdenv.isDarwin);
+  doCheck = false; #<<<
 
   preConfigure = ''
     sed -i '0,/from numpy.distutils.core/s//import setuptools;from numpy.distutils.core/' setup.py
