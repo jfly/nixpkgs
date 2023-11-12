@@ -23,10 +23,12 @@
 
 let
   openvpn3-core = fetchFromGitHub {
-    owner = "OpenVPN";
+    #<<< owner = "OpenVPN";
+    owner = "jfly";
     repo = "openvpn3";
-    rev = "release/3.8.3";
-    hash = "sha256-GZ1zun7mRjHX32tHDaReP2niPqkRhpyM2Apf/DQaXoA=";
+    #<<< rev = "release/3.8.3";
+    rev = "hacks";
+    hash = "sha256-IVjsvoelEoUn9nQwP05ai2XsS6N+YVknI+HKpUCddfs=";
   };
 in
 stdenv.mkDerivation rec {
