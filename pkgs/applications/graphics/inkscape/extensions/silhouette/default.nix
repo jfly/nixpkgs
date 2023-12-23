@@ -23,14 +23,14 @@ let
 in
 python3.pkgs.buildPythonApplication rec {
   pname = "inkscape-silhouette";
-  version = "1.28";
+  version = "1.28-unstable-2023-12-06";
   format = "setuptools";
 
   src = fetchFromGitHub {
     owner = "fablabnbg";
     repo = pname;
-    rev = "v${version}";
-    sha256 = "sha256-uNVhdkZFadL7QNlCsXq51TbhzRKH9KYDPDNCFhw3cQs=";
+    rev = "8128b6c9beeab79197afbf3b1e47ef36cb5dd70b";
+    sha256 = "sha256-CwB/OXeo5dfA0Js/KIIfvzMLkLMo7sZ3GYu+Lmqx/No=";
   };
 
   patches = [
