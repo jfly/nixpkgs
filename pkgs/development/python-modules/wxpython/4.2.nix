@@ -5,7 +5,6 @@
   setuptools,
   pythonAtLeast,
   fetchPypi,
-  fetchurl,
   substituteAll,
 
   # build
@@ -15,6 +14,7 @@
   pkg-config,
   python,
   sip,
+  waf,
   which,
 
   # runtime
@@ -41,12 +41,6 @@
   six,
 }:
 
-let
-  waf_2_0_25 = fetchurl {
-    url = "https://waf.io/waf-2.0.25";
-    hash = "sha256-IRmc0iDM9gQ0Ez4f0quMjlIXw3mRmcgnIlQ5cNyOONU=";
-  };
-in
 buildPythonPackage rec {
   pname = "wxpython";
   version = "4.2.1";
@@ -68,11 +62,8 @@ buildPythonPackage rec {
   ];
 
   postPatch = ''
-    cp ${waf_2_0_25} bin/waf-2.0.25
-    chmod +x bin/waf-2.0.25
+    ln -s ${waf}/bin/waf bin/waf
     substituteInPlace build.py \
-      --replace-fail "wafCurrentVersion = '2.0.24'" "wafCurrentVersion = '2.0.25'" \
-      --replace-fail "wafMD5 = '698f382cca34a08323670f34830325c4'" "wafMD5 = 'a4b1c34a03d594e5744f9e42f80d969d'" \
       --replace-fail "distutils.dep_util" "setuptools.modified"
   '';
 
@@ -118,6 +109,7 @@ buildPythonPackage rec {
     export DOXYGEN=${doxygen}/bin/doxygen
     export PATH="${wxGTK}/bin:$PATH"
     export SDL_CONFIG="${SDL.dev}/bin/sdl-config"
+    export WAF=$PWD/bin/waf
 
     ${python.pythonOnBuildForHost.interpreter} build.py -v --use_syswx dox etg sip --nodoc build_py
 
