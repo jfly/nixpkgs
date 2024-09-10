@@ -18,6 +18,7 @@
 , libusb1
 , glib
 , gettext
+, polkit
 , nixosTests
 , useIMobileDevice ? true
 , libimobiledevice
@@ -34,7 +35,7 @@ assert withDocs -> withIntrospection;
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "upower";
-  version = "1.90.4";
+  version = "1.90.6";
 
   outputs = [ "out" "dev" ]
     ++ lib.optionals withDocs [ "devdoc" ]
@@ -45,7 +46,7 @@ stdenv.mkDerivation (finalAttrs: {
     owner = "upower";
     repo = "upower";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-5twHuDLisVF07Y5KYwlqWMi12+p6UpARJvoBN/+tX2o=";
+    hash = "sha256-Y3MIB6a11P00B/6E3UyoyjLLP8TIT3vM2FDO7zlBz/w=";
   };
 
   patches = lib.optionals (stdenv.hostPlatform.system == "i686-linux") [
@@ -90,6 +91,7 @@ stdenv.mkDerivation (finalAttrs: {
   buildInputs = [
     libgudev
     libusb1
+    polkit
     udev
   ] ++ lib.optionals withIntrospection [
     # Duplicate from nativeCheckInputs until https://github.com/NixOS/nixpkgs/issues/161570 is solved
