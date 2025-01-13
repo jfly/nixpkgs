@@ -115,62 +115,41 @@ let
         # afterwards.
         (map (new_cfg:
           let
-            isSecret = attr: value: builtins.isString value && attr == "encryptionPassword";
-
-            resolveSecrets = attr: value:
-              if builtins.isAttrs value then
-                # Attribute set: process each attribute
-                builtins.mapAttrs (name: val: resolveSecrets name val) value
-              else if builtins.isList value then
-                # List: process each element
-                map (item: resolveSecrets "" item) value
-              else if isSecret attr value then
-                # String that looks like a path: replace with placeholder
+            jsonPreSecrets = pkgs.writeTextFile {
+              name = "${conf_type}-${new_cfg.id}-conf-pre-secrets.json";
+              text = builtins.toJSON new_cfg;
+            };
+            injectSecrtsJqCmd = (
+              if conf_type == "dirs" then
                 let
-                  varName = "secret_${builtins.hashString "sha256" value}";
+                  folder = new_cfg;
+                  devicesWithSecrets = lib.pipe folder.devices [
+                    (lib.filter (device: (builtins.isAttrs device) && device ? encryptionPasswordFile))
+                    (map (device: {
+                      deviceId = device.deviceId;
+                      variableName = "secret_${builtins.hashString "sha256" device.encryptionPasswordFile}";
+                      secretPath = device.encryptionPasswordFile;
+                    }))
+                  ];
+                  jqUpdates = map (device: ''
+                    .devices[] |= (
+                      if .deviceId == "${device.deviceId}" then
+                        del(.encryptionPasswordFile) |
+                        .encryptionPassword = ''$${device.variableName}
+                      else
+                        .
+                      end
+                    )
+                  '') devicesWithSecrets;
+                  jqRawFiles = map (device: "--rawfile ${device.variableName} ${lib.escapeShellArg device.secretPath}") devicesWithSecrets;
                 in
-                  "\${${varName}}"
+                  "${jq} ${lib.concatStringsSep " " jqRawFiles} ${lib.escapeShellArg (lib.concatStringsSep "|" (["."] ++ jqUpdates))}"
               else
-                # Other types: return as is
-                value;
-
-            # Function to collect all file paths from the configuration
-            collectPaths = attr: value:
-              if builtins.isAttrs value then
-                concatMap (name: collectPaths name value.${name}) (builtins.attrNames value)
-              else if builtins.isList value then
-                concatMap (name: collectPaths "" name) value
-              else if isSecret attr value then
-                [ value ]
-              else
-                [];
-
-            # Function to generate variable assignments for the secrets
-            generateSecretVars = paths:
-              concatStringsSep "\n" (map (path:
-                let
-                  varName = "secret_${builtins.hashString "sha256" path}";
-                in
-                  ''
-                    if [ ! -r ${path} ]; then
-                      echo "${path} does not exist"
-                      exit 1
-                    fi
-                    ${varName}=$(<${path})
-                  ''
-              ) paths);
-
-            resolved_cfg = resolveSecrets "" new_cfg;
-            secretPaths = collectPaths "" new_cfg;
-            secretVarsScript = generateSecretVars secretPaths;
-
-            jsonString = builtins.toJSON resolved_cfg;
-            escapedJson = builtins.replaceStrings ["\""] ["\\\""] jsonString;
+                "${jq} ."
+            );
           in
           ''
-            ${secretVarsScript}
-
-            curl -d "${escapedJson}" -X POST ${s.baseAddress}
+            ${injectSecrtsJqCmd} ${jsonPreSecrets} | curl --json @- -X POST ${s.baseAddress}
           ''
         ))
         (lib.concatStringsSep "\n")
@@ -450,8 +429,8 @@ in {
                       (types.attrsOf (types.submodule ({ name, ... }: {
                         freeformType = settingsFormat.type;
                         options = {
-                          encryptionPassword = mkOption {
-                            type = types.nullOr types.str;
+                          encryptionPasswordFile = mkOption {
+                            type = types.nullOr types.path;
                             default = null;
                             description = ''
                               Path to encryption password. If set, the file will be read during

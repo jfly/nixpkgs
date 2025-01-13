@@ -33,7 +33,7 @@ import ../make-test-python.nix (
             };
             folders.bar = {
               path = "/var/lib/syncthing/bar";
-              devices.c.encryptionPassword = "${testPasswordFile}";
+              devices.c.encryptionPasswordFile = "${testPasswordFile}";
             };
           };
         };
@@ -53,7 +53,7 @@ import ../make-test-python.nix (
             };
             folders.bar = {
               path = "/var/lib/syncthing/bar";
-              devices.c.encryptionPassword = "${testPasswordFile}";
+              devices.c.encryptionPasswordFile = "${testPasswordFile}";
             };
           };
         };
