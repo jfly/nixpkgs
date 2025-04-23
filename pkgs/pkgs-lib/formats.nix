@@ -39,6 +39,13 @@ rec {
 
   libconfig = (import ./formats/libconfig/default.nix { inherit lib pkgs; }).format;
 
+  libconfuse =
+    { }:
+    {
+      type = null;
+      generate = name: value: "";
+    };
+
   hocon = (import ./formats/hocon/default.nix { inherit lib pkgs; }).format;
 
   php = (import ./formats/php/default.nix { inherit lib pkgs; }).format;

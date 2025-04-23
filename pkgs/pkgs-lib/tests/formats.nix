@@ -815,6 +815,69 @@ runBuildTests {
     '';
   };
 
+  libConfigAtoms = shouldPass {
+    format = formats.libconfig { };
+    input = {
+      _false = false;
+      _true = true;
+      int = 10;
+      float = 3.141;
+      str = "foo";
+      list = [
+        "hello"
+        "world"
+      ];
+
+      # 1.1. Environment variables in values
+      # https://www.nongnu.org/confuse/tutorial-html/index.html#id320679
+      envVarNoFallback = mkEnv "USER";
+      envVarWithFallback = mkEnv "USER" "User";
+
+      # 4. Using sections
+      # https://www.nongnu.org/confuse/tutorial-html/ar01s04.html
+      foo = mkSection {
+        name = "greeting";
+        contents = {
+          value = "first-value";
+          bar = mkSection {
+            name = "greeting";
+            title = "NamedSubsection";
+            contents = {
+              targets = [
+                "Adams"
+              ];
+            };
+          };
+        };
+      };
+    };
+    expected = ''
+      _false = false
+      _true = true
+      int = 10
+      float = 3.141
+      str = "foo"
+      list = {"hello", "world"}
+      envVarNoFallback = ''${USER}
+      envVarWithFallback = ''${USER:-User}
+      anonymousSection
+      {
+          value = "first-value"
+          greeting NamedSubsection
+          {
+              value = "second-value"
+          }
+      }
+    '';
+  };
+
+  libConfigInvalidNull = shouldFail {
+    format = formats.libconfig { };
+    input = {
+      null = null;
+    };
+  };
+
   phpAtoms = shouldPass rec {
     format = formats.php { finalVariable = "config"; };
     input = {

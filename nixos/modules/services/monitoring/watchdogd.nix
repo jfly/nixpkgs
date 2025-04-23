@@ -103,6 +103,8 @@ in
     let
       toConfig = attrs: lib.concatStringsSep "\n" (lib.mapAttrsToList toValue attrs);
 
+      # TODO: add lists https://www.nongnu.org/confuse/tutorial-html/ar01s03.html
+      # TODO: add sections (urg, they can be nested) https://www.nongnu.org/confuse/tutorial-html/ar01s04.html
       toValue =
         name: value:
         if lib.isAttrs value then
