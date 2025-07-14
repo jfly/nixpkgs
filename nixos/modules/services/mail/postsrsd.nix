@@ -143,6 +143,7 @@ in
             srs-domain = lib.mkOption {
               type = with lib.types; nullOr str;
               example = "srs.example.com";
+              default = null;
               description = ''
                 Mail domain used for ephemeral SRS envelope addresses.
 
