@@ -9,7 +9,9 @@
   qemu_test,
   socat,
   ruff,
+  systemd,
   tesseract4,
+  util-linux,
   vde2,
   extraPythonPackages ? (_: [ ]),
   nixosTests,
@@ -43,6 +45,8 @@ python3Packages.buildPythonApplication {
     qemu_pkg
     socat
     vde2
+    systemd
+    util-linux
   ]
   ++ lib.optionals enableOCR [
     imagemagick_light

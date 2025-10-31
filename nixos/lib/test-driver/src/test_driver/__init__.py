@@ -16,7 +16,7 @@ from test_driver.logger import (
 
 
 class EnvDefault(argparse.Action):
-    """An argpars Action that takes values from the specified
+    """An argparse Action that takes values from the specified
     environment variable as the flags default value.
     """
 
@@ -71,12 +71,20 @@ def main() -> None:
         help="Enable interactive debugging breakpoints for sandboxed runs",
     )
     arg_parser.add_argument(
-        "--start-scripts",
-        metavar="START-SCRIPT",
+        "--vm-start-scripts",
+        metavar="VM-START-SCRIPT",
         action=EnvDefault,
-        envvar="startScripts",
+        envvar="vmStartScripts",
         nargs="*",
         help="start scripts for participating virtual machines",
+    )
+    arg_parser.add_argument(
+        "--container-start-scripts",
+        metavar="CONTAINER-START-SCRIPT",
+        action=EnvDefault,
+        envvar="containerStartScripts",
+        nargs="*",
+        help="start scripts for participating containers",
     )
     arg_parser.add_argument(
         "--vlans",
@@ -139,7 +147,8 @@ def main() -> None:
         debugger = Debug(logger, args.debug_hook_attach)
 
     with Driver(
-        args.start_scripts,
+        args.vm_start_scripts or [],
+        args.container_start_scripts or [],
         args.vlans,
         args.testscript.read_text(),
         output_directory,
@@ -170,7 +179,7 @@ def generate_driver_symbols() -> None:
     in user's test scripts. That list is then used by pyflakes to lint those
     scripts.
     """
-    d = Driver([], [], "", Path(), CompositeLogger([]))
+    d = Driver([], [], [], "", Path(), CompositeLogger([]))
     test_symbols = d.test_symbols()
     with open("driver-symbols", "w") as fp:
         fp.write(",".join(test_symbols.keys()))
