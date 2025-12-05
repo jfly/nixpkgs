@@ -1552,7 +1552,10 @@ in
   teleports = runTest ./teleports.nix;
   temporal = runTest ./temporal.nix;
   terminal-emulators = handleTest ./terminal-emulators.nix { };
-  test-containers = runTest ./test-containers.nix;
+  test-containers = (runTest ./test-containers.nix).overrideTestDerivation (prevAttrs: {
+    # <<< TODO: is there a better way to add `requiredSystemFeatures` to a nixos test? ideally this would live in the test, rather than outside of it.
+    requiredSystemFeatures = prevAttrs.requiredSystemFeatures ++ [ "cuda" ];
+  });
   thanos = runTest ./thanos.nix;
   thelounge = handleTest ./thelounge.nix { };
   tiddlywiki = runTest ./tiddlywiki.nix;

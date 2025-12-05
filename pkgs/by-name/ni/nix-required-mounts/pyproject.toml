@@ -8,7 +8,7 @@ version = "0.0.1"
 description = """
 A --pre-build-hook for Nix, \
 that allows to expose extra paths in the build sandbox \
-based on derivations' requiredSystemFeatrues"""
+based on derivations' requiredSystemFeatures"""
 
 [project.urls]
 Homepage = "https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/ni/nix-required-mounts"

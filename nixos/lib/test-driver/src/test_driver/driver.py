@@ -138,6 +138,10 @@ class Driver:
         )
         in_build_sandbox = "out" in os.environ  # <<< TODO: get rid of this hack >>>
         if in_build_sandbox:
+            # <<< TODO: explain this CUDA hack. what's the right fix? not clobber /run with a tmpfs? >>>
+            Path("/host/run").mkdir(parents=True)
+            subprocess.run(["mount", "--bind", "/run", "/host/run"], check=True)
+
             Path("/run").mkdir(parents=True, exist_ok=True)
             subprocess.run(["mount", "-t", "tmpfs", "none", "/run"], check=True)
             Path("/run/netns").mkdir(parents=True, exist_ok=True)
