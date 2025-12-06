@@ -15,6 +15,7 @@ import threading
 import time
 from collections.abc import Callable, Generator
 from contextlib import _GeneratorContextManager, contextmanager, nullcontext
+from functools import cached_property
 from pathlib import Path
 from queue import Queue
 from typing import Any
@@ -109,14 +110,29 @@ def retry(fn: Callable, timeout: int = 900) -> None:
         )
 
 
-class StartCommand:
-    """The Base Start Command knows how to append the necessary
+class QemuStartCommand:
+    """This class knows how to append the necessary
     runtime qemu options as determined by a particular test driver
-    run. Any such start command is expected to happily receive and
-    append additional qemu args.
+    run.
     """
 
     _cmd: str
+
+    def __init__(self, script: str):
+        self._cmd = script
+
+    @property
+    def machine_name(self) -> str:
+        """A start script from nixos/modules/virtualiation/qemu-vm.nix.
+        These Nix commands have the particular characteristic that the
+        machine name can be extracted out of them via a regex match.
+        (Admittedly a _very_ implicit contract, evtl. TODO fix)
+        """
+        match = re.search("run-(.+)-vm$", self._cmd)
+        name = "machine"
+        if match:
+            name = match.group(1)
+        return name
 
     def cmd(
         self,
@@ -193,103 +209,19 @@ class StartCommand:
         )
 
 
-class NixStartScript(StartCommand):
-    """A start script from nixos/modules/virtualiation/qemu-vm.nix.
-    These Nix commands have the particular characteristic that the
-    machine name can be extracted out of them via a regex match.
-    (Admittedly a _very_ implicit contract, evtl. TODO fix)
-    """
-
-    def __init__(self, script: str):
-        self._cmd = script
-
-    @property
-    def machine_name(self) -> str:
-        match = re.search("run-(.+)-vm$", self._cmd)
-        name = "machine"
-        if match:
-            name = match.group(1)
-        return name
-
-
-class Machine:
-    """A handle to the machine with this name, that also knows how to manage
-    the machine lifecycle with the help of a start script / command."""
-
+class BaseMachine:
     name: str
-    out_dir: Path
-    tmp_dir: Path
-    shared_dir: Path
-    state_dir: Path
-    monitor_path: Path
-    qmp_path: Path
-    shell_path: Path
-
-    start_command: StartCommand
-    keep_vm_state: bool
-
-    process: subprocess.Popen | None
-    pid: int | None
-    monitor: socket.socket | None
-    qmp_client: QMPSession | None
-    shell: socket.socket | None
-    serial_thread: threading.Thread | None
-
-    booted: bool
-    connected: bool
-    # Store last serial console lines for use
-    # of wait_for_console_text
-    last_lines: Queue = Queue()
-    # Store all console output for full log retrieval
-    full_console_log: list[str]
-    callbacks: list[Callable]
 
     def __repr__(self) -> str:
-        return f"<Machine '{self.name}'>"
+        return f"<{self.__class__.__name__} '{self.name}'>"
 
     def __init__(
         self,
-        out_dir: Path,
-        tmp_dir: Path,
-        start_command: StartCommand,
+        name: str,
         logger: AbstractLogger,
-        name: str = "machine",
-        keep_vm_state: bool = False,
-        callbacks: list[Callable] | None = None,
     ) -> None:
-        self.out_dir = out_dir
-        self.tmp_dir = tmp_dir
-        self.keep_vm_state = keep_vm_state
         self.name = name
-        self.start_command = start_command
-        self.callbacks = callbacks if callbacks is not None else []
         self.logger = logger
-        self.full_console_log = []
-
-        # set up directories
-        self.shared_dir = self.tmp_dir / "shared-xchg"
-        self.shared_dir.mkdir(mode=0o700, exist_ok=True)
-
-        self.state_dir = self.tmp_dir / f"vm-state-{self.name}"
-        self.monitor_path = self.state_dir / "monitor"
-        self.qmp_path = self.state_dir / "qmp"
-        self.shell_path = self.state_dir / "shell"
-        if (not self.keep_vm_state) and self.state_dir.exists():
-            self.cleanup_statedir()
-        self.state_dir.mkdir(mode=0o700, exist_ok=True)
-
-        self.process = None
-        self.pid = None
-        self.monitor = None
-        self.qmp_client = None
-        self.shell = None
-        self.serial_thread = None
-
-        self.booted = False
-        self.connected = False
-
-    def is_up(self) -> bool:
-        return self.booted and self.connected
 
     def log(self, msg: str) -> None:
         self.logger.log(msg, {"machine": self.name})
@@ -297,33 +229,28 @@ class Machine:
     def log_serial(self, msg: str) -> None:
         self.logger.log_serial(msg, self.name)
 
-    def nested(self, msg: str, attrs: dict[str, str] = {}) -> _GeneratorContextManager:
-        my_attrs = {"machine": self.name}
-        my_attrs.update(attrs)
-        return self.logger.nested(msg, my_attrs)
-
-    def wait_for_monitor_prompt(self) -> str:
-        assert self.monitor is not None
-        answer = ""
-        while True:
-            undecoded_answer = self.monitor.recv(1024)
-            if not undecoded_answer:
-                break
-            answer += undecoded_answer.decode()
-            if answer.endswith("(qemu) "):
-                break
-        return answer
-
-    def send_monitor_command(self, command: str) -> str:
+    def systemctl(self, q: str, user: str | None = None) -> tuple[int, str]:
         """
-        Send a command to the QEMU monitor. This allows attaching
-        virtual USB disks to a running machine, among other things.
+        Runs `systemctl` commands with optional support for
+        `systemctl --user`
+
+        ```py
+        # run `systemctl list-jobs --no-pager`
+        machine.systemctl("list-jobs --no-pager")
+
+        # spawn a shell for `any-user` and run
+        # `systemctl --user list-jobs --no-pager`
+        machine.systemctl("list-jobs --no-pager", "any-user")
+        ```
         """
-        self.run_callbacks()
-        message = f"{command}\n".encode()
-        assert self.monitor is not None
-        self.monitor.send(message)
-        return self.wait_for_monitor_prompt()
+        if user is not None:
+            q = q.replace("'", "\\'")
+            return self.execute(
+                f"su -l {user} --shell /bin/sh -c "
+                "$'XDG_RUNTIME_DIR=/run/user/`id -u` "
+                f"systemctl --user {q}'"
+            )
+        return self.execute(f"systemctl {q}")
 
     def wait_for_unit(
         self, unit: str, user: str | None = None, timeout: int = 900
@@ -356,28 +283,6 @@ class Machine:
         ):
             retry(check_active, timeout)
 
-    def get_unit_info(self, unit: str, user: str | None = None) -> dict[str, str]:
-        status, lines = self.systemctl(f'--no-pager show "{unit}"', user)
-        if status != 0:
-            raise RequestedAssertionFailed(
-                f'retrieving systemctl info for unit "{unit}"'
-                + ("" if user is None else f' under user "{user}"')
-                + f" failed with exit code {status}"
-            )
-
-        line_pattern = re.compile(r"^([^=]+)=(.*)$")
-
-        def tuple_from_line(line: str) -> tuple[str, str]:
-            match = line_pattern.match(line)
-            assert match is not None
-            return match[1], match[2]
-
-        return dict(
-            tuple_from_line(line)
-            for line in lines.split("\n")
-            if line_pattern.match(line)
-        )
-
     def get_unit_property(
         self,
         unit: str,
@@ -407,28 +312,27 @@ class Machine:
         assert match[1] == property, invalid_output_message
         return match[2]
 
-    def systemctl(self, q: str, user: str | None = None) -> tuple[int, str]:
-        """
-        Runs `systemctl` commands with optional support for
-        `systemctl --user`
-
-        ```py
-        # run `systemctl list-jobs --no-pager`
-        machine.systemctl("list-jobs --no-pager")
-
-        # spawn a shell for `any-user` and run
-        # `systemctl --user list-jobs --no-pager`
-        machine.systemctl("list-jobs --no-pager", "any-user")
-        ```
-        """
-        if user is not None:
-            q = q.replace("'", "\\'")
-            return self.execute(
-                f"su -l {user} --shell /bin/sh -c "
-                "$'XDG_RUNTIME_DIR=/run/user/`id -u` "
-                f"systemctl --user {q}'"
+    def get_unit_info(self, unit: str, user: str | None = None) -> dict[str, str]:
+        status, lines = self.systemctl(f'--no-pager show "{unit}"', user)
+        if status != 0:
+            raise RequestedAssertionFailed(
+                f'retrieving systemctl info for unit "{unit}"'
+                + ("" if user is None else f' under user "{user}"')
+                + f" failed with exit code {status}"
             )
-        return self.execute(f"systemctl {q}")
+
+        line_pattern = re.compile(r"^([^=]+)=(.*)$")
+
+        def tuple_from_line(line: str) -> tuple[str, str]:
+            match = line_pattern.match(line)
+            assert match is not None
+            return match[1], match[2]
+
+        return dict(
+            tuple_from_line(line)
+            for line in lines.split("\n")
+            if line_pattern.match(line)
+        )
 
     def require_unit_state(self, unit: str, require_state: str = "active") -> None:
         with self.nested(
@@ -441,6 +345,296 @@ class Machine:
                     f"Expected unit '{unit}' to to be in state "
                     f"'{require_state}' but it is in state '{state}'"
                 )
+
+    def nested(self, msg: str, attrs: dict[str, str] = {}) -> _GeneratorContextManager:
+        my_attrs = {"machine": self.name}
+        my_attrs.update(attrs)
+        return self.logger.nested(msg, my_attrs)
+
+    def succeed(self, *commands: str, timeout: int | None = None) -> str:
+        """
+        Execute a shell command, raising an exception if the exit status is
+        not zero, otherwise returning the standard output. Similar to `execute`,
+        except that the timeout is `None` by default. See `execute` for details on
+        command execution.
+        """
+        output = ""
+        for command in commands:
+            with self.nested(f"must succeed: {command}"):
+                (status, out) = self.execute(command, timeout=timeout)
+                if status != 0:
+                    self.log(f"output: {out}")
+                    raise RequestedAssertionFailed(
+                        f"command `{command}` failed (exit code {status})"
+                    )
+                output += out
+        return output
+
+    def fail(self, *commands: str, timeout: int | None = None) -> str:
+        """
+        Like `succeed`, but raising an exception if the command returns a zero
+        status.
+        """
+        output = ""
+        for command in commands:
+            with self.nested(f"must fail: {command}"):
+                (status, out) = self.execute(command, timeout=timeout)
+                if status == 0:
+                    raise RequestedAssertionFailed(
+                        f"command `{command}` unexpectedly succeeded"
+                    )
+                output += out
+        return output
+
+    def wait_until_succeeds(self, command: str, timeout: int = 900) -> str:
+        """
+        Repeat a shell command with 1-second intervals until it succeeds.
+        Has a default timeout of 900 seconds which can be modified, e.g.
+        `wait_until_succeeds(cmd, timeout=10)`. See `execute` for details on
+        command execution.
+        Throws an exception on timeout.
+        """
+        output = ""
+
+        def check_success(_last_try: bool) -> bool:
+            nonlocal output
+            status, output = self.execute(command, timeout=timeout)
+            return status == 0
+
+        with self.nested(f"waiting for success: {command}"):
+            retry(check_success, timeout)
+            return output
+
+    def wait_until_fails(self, command: str, timeout: int = 900) -> str:
+        """
+        Like `wait_until_succeeds`, but repeating the command until it fails.
+        """
+        output = ""
+
+        def check_failure(_last_try: bool) -> bool:
+            nonlocal output
+            status, output = self.execute(command, timeout=timeout)
+            return status != 0
+
+        with self.nested(f"waiting for failure: {command}"):
+            retry(check_failure, timeout)
+            return output
+
+    def sleep(self, secs: int) -> None:
+        # We want to sleep in *guest* time, not *host* time.
+        self.succeed(f"sleep {secs}")
+
+    def wait_for_file(self, filename: str, timeout: int = 900) -> None:
+        """
+        Waits until the file exists in the machine's file system.
+        """
+
+        def check_file(_last_try: bool) -> bool:
+            status, _ = self.execute(f"test -e {filename}")
+            return status == 0
+
+        with self.nested(f"waiting for file '{filename}'"):
+            retry(check_file, timeout)
+
+    def wait_for_open_port(
+        self, port: int, addr: str = "localhost", timeout: int = 900
+    ) -> None:
+        """
+        Wait until a process is listening on the given TCP port and IP address
+        (default `localhost`).
+        """
+
+        def port_is_open(_last_try: bool) -> bool:
+            status, _ = self.execute(f"nc -z {addr} {port}")
+            return status == 0
+
+        with self.nested(f"waiting for TCP port {port} on {addr}"):
+            retry(port_is_open, timeout)
+
+    def wait_for_open_unix_socket(
+        self, addr: str, is_datagram: bool = False, timeout: int = 900
+    ) -> None:
+        """
+        Wait until a process is listening on the given UNIX-domain socket
+        (default to a UNIX-domain stream socket).
+        """
+
+        nc_flags = [
+            "-z",
+            "-uU" if is_datagram else "-U",
+        ]
+
+        def socket_is_open(_last_try: bool) -> bool:
+            status, _ = self.execute(f"nc {' '.join(nc_flags)} {addr}")
+            return status == 0
+
+        with self.nested(
+            f"waiting for UNIX-domain {'datagram' if is_datagram else 'stream'} on '{addr}'"
+        ):
+            retry(socket_is_open, timeout)
+
+    def wait_for_closed_port(
+        self, port: int, addr: str = "localhost", timeout: int = 900
+    ) -> None:
+        """
+        Wait until nobody is listening on the given TCP port and IP address
+        (default `localhost`).
+        """
+
+        def port_is_closed(_last_try: bool) -> bool:
+            status, _ = self.execute(f"nc -z {addr} {port}")
+            return status != 0
+
+        with self.nested(f"waiting for TCP port {port} on {addr} to be closed"):
+            retry(port_is_closed, timeout)
+
+    def start_job(self, jobname: str, user: str | None = None) -> tuple[int, str]:
+        return self.systemctl(f"start {jobname}", user)
+
+    def stop_job(self, jobname: str, user: str | None = None) -> tuple[int, str]:
+        return self.systemctl(f"stop {jobname}", user)
+
+    def wait_for_job(self, jobname: str) -> None:
+        self.wait_for_unit(jobname)
+
+    def get_tty_text(self, tty: str) -> str:
+        status, output = self.execute(
+            f"fold -w$(stty -F /dev/tty{tty} size | awk '{{print $2}}') /dev/vcs{tty}"
+        )
+        return output
+
+    def wait_until_tty_matches(self, tty: str, regexp: str, timeout: int = 900) -> None:
+        """Wait until the visible output on the chosen TTY matches regular
+        expression. Throws an exception on timeout.
+        """
+        matcher = re.compile(regexp)
+
+        def tty_matches(last_try: bool) -> bool:
+            text = self.get_tty_text(tty)
+            if last_try:
+                self.log(
+                    f"Last chance to match /{regexp}/ on TTY{tty}, "
+                    f"which currently contains: {text}"
+                )
+            return len(matcher.findall(text)) > 0
+
+        with self.nested(f"waiting for {regexp} to appear on tty {tty}"):
+            retry(tty_matches, timeout)
+
+    def dump_tty_contents(self, tty: str) -> None:
+        """Debugging: Dump the contents of the TTY<n>"""
+        self.execute(f"fold -w 80 /dev/vcs{tty} | systemd-cat")
+
+    def execute(
+        self,
+        command: str,
+        check_return: bool = True,
+        check_output: bool = True,
+        timeout: int | None = 900,
+    ) -> tuple[int, str]:
+        raise NotImplementedError()
+
+
+class QemuMachine(BaseMachine):
+    """A handle to the machine with this name, that also knows how to manage
+    the machine lifecycle with the help of a start script / command."""
+
+    name: str
+    out_dir: Path
+    tmp_dir: Path
+    shared_dir: Path
+    state_dir: Path
+    monitor_path: Path
+    qmp_path: Path
+    shell_path: Path
+
+    start_command: QemuStartCommand
+    keep_vm_state: bool
+
+    process: subprocess.Popen | None
+    pid: int | None
+    monitor: socket.socket | None
+    qmp_client: QMPSession | None
+    shell: socket.socket | None
+    serial_thread: threading.Thread | None
+
+    booted: bool
+    connected: bool
+    # Store last serial console lines for use
+    # of wait_for_console_text
+    last_lines: Queue = Queue()
+    # Store all console output for full log retrieval
+    full_console_log: list[str]
+    callbacks: list[Callable]
+
+    def __init__(
+        self,
+        out_dir: Path,
+        tmp_dir: Path,
+        start_command: str,
+        logger: AbstractLogger,
+        name: str | None = None,
+        keep_vm_state: bool = False,
+        callbacks: list[Callable] | None = None,
+    ) -> None:
+        self.start_command = QemuStartCommand(start_command)
+        self.name = name or self.start_command.machine_name
+
+        super().__init__(name=self.name, logger=logger)
+
+        self.out_dir = out_dir
+        self.tmp_dir = tmp_dir
+        self.keep_vm_state = keep_vm_state
+        self.callbacks = callbacks if callbacks is not None else []
+        self.full_console_log = []
+
+        # set up directories
+        self.shared_dir = self.tmp_dir / "shared-xchg"
+        self.shared_dir.mkdir(mode=0o700, exist_ok=True)
+
+        self.state_dir = self.tmp_dir / f"vm-state-{self.name}"
+        self.monitor_path = self.state_dir / "monitor"
+        self.qmp_path = self.state_dir / "qmp"
+        self.shell_path = self.state_dir / "shell"
+        if (not self.keep_vm_state) and self.state_dir.exists():
+            self.cleanup_statedir()
+        self.state_dir.mkdir(mode=0o700, exist_ok=True)
+
+        self.process = None
+        self.pid = None
+        self.monitor = None
+        self.qmp_client = None
+        self.shell = None
+        self.serial_thread = None
+
+        self.booted = False
+        self.connected = False
+
+    def is_up(self) -> bool:
+        return self.booted and self.connected
+
+    def wait_for_monitor_prompt(self) -> str:
+        assert self.monitor is not None
+        answer = ""
+        while True:
+            undecoded_answer = self.monitor.recv(1024)
+            if not undecoded_answer:
+                break
+            answer += undecoded_answer.decode()
+            if answer.endswith("(qemu) "):
+                break
+        return answer
+
+    def send_monitor_command(self, command: str) -> str:
+        """
+        Send a command to the QEMU monitor. This allows attaching
+        virtual USB disks to a running machine, among other things.
+        """
+        self.run_callbacks()
+        message = f"{command}\n".encode()
+        assert self.monitor is not None
+        self.monitor.send(message)
+        return self.wait_for_monitor_prompt()
 
     def _next_newline_closed_block_from_shell(self) -> str:
         assert self.shell
@@ -578,75 +772,6 @@ class Machine:
                 break
             self.send_console(char.decode())
 
-    def succeed(self, *commands: str, timeout: int | None = None) -> str:
-        """
-        Execute a shell command, raising an exception if the exit status is
-        not zero, otherwise returning the standard output. Similar to `execute`,
-        except that the timeout is `None` by default. See `execute` for details on
-        command execution.
-        """
-        output = ""
-        for command in commands:
-            with self.nested(f"must succeed: {command}"):
-                (status, out) = self.execute(command, timeout=timeout)
-                if status != 0:
-                    self.log(f"output: {out}")
-                    raise RequestedAssertionFailed(
-                        f"command `{command}` failed (exit code {status})"
-                    )
-                output += out
-        return output
-
-    def fail(self, *commands: str, timeout: int | None = None) -> str:
-        """
-        Like `succeed`, but raising an exception if the command returns a zero
-        status.
-        """
-        output = ""
-        for command in commands:
-            with self.nested(f"must fail: {command}"):
-                (status, out) = self.execute(command, timeout=timeout)
-                if status == 0:
-                    raise RequestedAssertionFailed(
-                        f"command `{command}` unexpectedly succeeded"
-                    )
-                output += out
-        return output
-
-    def wait_until_succeeds(self, command: str, timeout: int = 900) -> str:
-        """
-        Repeat a shell command with 1-second intervals until it succeeds.
-        Has a default timeout of 900 seconds which can be modified, e.g.
-        `wait_until_succeeds(cmd, timeout=10)`. See `execute` for details on
-        command execution.
-        Throws an exception on timeout.
-        """
-        output = ""
-
-        def check_success(_last_try: bool) -> bool:
-            nonlocal output
-            status, output = self.execute(command, timeout=timeout)
-            return status == 0
-
-        with self.nested(f"waiting for success: {command}"):
-            retry(check_success, timeout)
-            return output
-
-    def wait_until_fails(self, command: str, timeout: int = 900) -> str:
-        """
-        Like `wait_until_succeeds`, but repeating the command until it fails.
-        """
-        output = ""
-
-        def check_failure(_last_try: bool) -> bool:
-            nonlocal output
-            status, output = self.execute(command, timeout=timeout)
-            return status != 0
-
-        with self.nested(f"waiting for failure: {command}"):
-            retry(check_failure, timeout)
-            return output
-
     def wait_for_shutdown(self) -> None:
         if not self.booted:
             return
@@ -686,30 +811,6 @@ class Machine:
             if elapsed >= timeout:
                 raise TimeoutError
 
-    def get_tty_text(self, tty: str) -> str:
-        status, output = self.execute(
-            f"fold -w$(stty -F /dev/tty{tty} size | awk '{{print $2}}') /dev/vcs{tty}"
-        )
-        return output
-
-    def wait_until_tty_matches(self, tty: str, regexp: str, timeout: int = 900) -> None:
-        """Wait until the visible output on the chosen TTY matches regular
-        expression. Throws an exception on timeout.
-        """
-        matcher = re.compile(regexp)
-
-        def tty_matches(last_try: bool) -> bool:
-            text = self.get_tty_text(tty)
-            if last_try:
-                self.log(
-                    f"Last chance to match /{regexp}/ on TTY{tty}, "
-                    f"which currently contains: {text}"
-                )
-            return len(matcher.findall(text)) > 0
-
-        with self.nested(f"waiting for {regexp} to appear on tty {tty}"):
-            retry(tty_matches, timeout)
-
     def send_chars(self, chars: str, delay: float | None = 0.01) -> None:
         r"""
         Simulate typing a sequence of characters on the virtual keyboard,
@@ -719,79 +820,6 @@ class Machine:
         with self.nested(f"sending keys {repr(chars)}"):
             for char in chars:
                 self.send_key(char, delay, log=False)
-
-    def wait_for_file(self, filename: str, timeout: int = 900) -> None:
-        """
-        Waits until the file exists in the machine's file system.
-        """
-
-        def check_file(_last_try: bool) -> bool:
-            status, _ = self.execute(f"test -e {filename}")
-            return status == 0
-
-        with self.nested(f"waiting for file '{filename}'"):
-            retry(check_file, timeout)
-
-    def wait_for_open_port(
-        self, port: int, addr: str = "localhost", timeout: int = 900
-    ) -> None:
-        """
-        Wait until a process is listening on the given TCP port and IP address
-        (default `localhost`).
-        """
-
-        def port_is_open(_last_try: bool) -> bool:
-            status, _ = self.execute(f"nc -z {addr} {port}")
-            return status == 0
-
-        with self.nested(f"waiting for TCP port {port} on {addr}"):
-            retry(port_is_open, timeout)
-
-    def wait_for_open_unix_socket(
-        self, addr: str, is_datagram: bool = False, timeout: int = 900
-    ) -> None:
-        """
-        Wait until a process is listening on the given UNIX-domain socket
-        (default to a UNIX-domain stream socket).
-        """
-
-        nc_flags = [
-            "-z",
-            "-uU" if is_datagram else "-U",
-        ]
-
-        def socket_is_open(_last_try: bool) -> bool:
-            status, _ = self.execute(f"nc {' '.join(nc_flags)} {addr}")
-            return status == 0
-
-        with self.nested(
-            f"waiting for UNIX-domain {'datagram' if is_datagram else 'stream'} on '{addr}'"
-        ):
-            retry(socket_is_open, timeout)
-
-    def wait_for_closed_port(
-        self, port: int, addr: str = "localhost", timeout: int = 900
-    ) -> None:
-        """
-        Wait until nobody is listening on the given TCP port and IP address
-        (default `localhost`).
-        """
-
-        def port_is_closed(_last_try: bool) -> bool:
-            status, _ = self.execute(f"nc -z {addr} {port}")
-            return status != 0
-
-        with self.nested(f"waiting for TCP port {port} on {addr} to be closed"):
-            retry(port_is_closed, timeout)
-
-    def start_job(self, jobname: str, user: str | None = None) -> tuple[int, str]:
-        return self.systemctl(f"start {jobname}", user)
-
-    def stop_job(self, jobname: str, user: str | None = None) -> tuple[int, str]:
-        return self.systemctl(f"stop {jobname}", user)
-
-    def wait_for_job(self, jobname: str) -> None:
-        self.wait_for_unit(jobname)
 
     def connect(self) -> None:
         def shell_ready(timeout_secs: int) -> bool:
@@ -935,10 +963,6 @@ class Machine:
                 shutil.copytree(intermediate, abs_target)
             else:
                 shutil.copy(intermediate, abs_target)
-
-    def dump_tty_contents(self, tty: str) -> None:
-        """Debugging: Dump the contents of the TTY<n>"""
-        self.execute(f"fold -w 80 /dev/vcs{tty} | systemd-cat")
 
     def get_screen_text_variants(self) -> list[str]:
         """
@@ -1200,10 +1224,6 @@ class Machine:
         with self.nested("waiting for a window to appear"):
             retry(window_is_visible, timeout)
 
-    def sleep(self, secs: int) -> None:
-        # We want to sleep in *guest* time, not *host* time.
-        self.succeed(f"sleep {secs}")
-
     def forward_port(self, host_port: int = 8080, guest_port: int = 80) -> None:
         """
         Forward a TCP port on the host to a TCP port on the guest.
@@ -1230,7 +1250,7 @@ class Machine:
     def release(self) -> None:
         if self.pid is None:
             return
-        self.logger.info(f"kill machine (pid {self.pid})")
+        self.logger.info(f"kill QemuMachine (pid {self.pid})")
         assert self.process
         assert self.shell
         assert self.monitor
@@ -1262,3 +1282,136 @@ class Machine:
         )
         self.connected = False
         self.connect()
+
+
+class NspawnMachine(BaseMachine):
+    start_command: str
+    tmp_dir: Path
+    process: subprocess.Popen | None
+    pid: int | None
+
+    def __init__(
+        self,
+        start_command: str,
+        tmp_dir: Path,
+        logger: AbstractLogger,
+    ):
+        self.start_command = start_command
+        self.tmp_dir = tmp_dir
+
+        # TODO: don't compute name from `start_command` path, instead thread it down explicitly.
+        # See analogous TODO in `QemuStartCommand::machine_name`.
+        match = re.search("run-(.+)-nspawn", os.path.basename(start_command))
+        assert match is not None, f"Could not extract node name from {start_command}"
+        name = match.group(1)
+
+        self.process = None
+        self.pid = None
+
+        super().__init__(name=name, logger=logger)
+
+    def release(self) -> None:
+        if self.pid is None:
+            return
+
+        self.logger.info(f"kill NspawnMachine (pid {self.pid})")
+        assert self.process is not None
+        self.process.terminate()
+        self.process = None
+
+    def is_up(self) -> bool:
+        return self.process is not None
+
+    @cached_property
+    def get_systemd_process(self) -> int:
+        if self.process is None:
+            msg = "Machine not started"
+            raise RuntimeError(msg)
+        if self.process.stdout is None:
+            msg = "Machine has no stdout"
+            raise RuntimeError(msg)
+
+        systemd_nspawn_pid = None
+        for line_bytes in self.process.stdout:
+            line = line_bytes.decode()
+            print(line, end="")
+
+            systemd_nspawn_pid_prefix = "systemd-nspawn's PID is "
+            if line.startswith(systemd_nspawn_pid_prefix):
+                systemd_nspawn_pid = int(line.removeprefix(systemd_nspawn_pid_prefix))
+
+            if (
+                line.startswith("systemd[1]: Startup finished in")
+                or "Welcome to NixOS" in line
+            ):
+                assert systemd_nspawn_pid is not None, "Must find systemd-nspawn PID"
+                break
+        else:
+            msg = f"Failed to start container {self.name}"
+            raise RuntimeError(msg)
+
+        childs = (
+            Path(f"/proc/{systemd_nspawn_pid}/task/{systemd_nspawn_pid}/children")
+            .read_text()
+            .split()
+        )
+        assert len(childs) == 1, (
+            f"Expected exactly one child process for systemd-nspawn, got {childs}"
+        )
+
+        try:
+            return int(childs[0])
+        except ValueError as e:
+            msg = f"Failed to parse child process id {childs[0]}"
+            raise RuntimeError(msg) from e
+
+    def execute(
+        self,
+        command: str,
+        check_return: bool = True,
+        check_output: bool = True,
+        timeout: int | None = 900,
+    ) -> tuple[int, str]:
+        container_pid = self.get_systemd_process
+        nsenter = shutil.which("nsenter")
+        assert nsenter is not None
+
+        # Pull in /etc/profile, and some shell sanity.
+        command = f"set -eo pipefail; source /etc/profile; set -xu; {command}"
+        cp = subprocess.run(
+            [
+                nsenter,
+                "--target",
+                str(container_pid),
+                "--mount",
+                "--uts",
+                "--ipc",
+                "--net",
+                "--pid",
+                "--cgroup",
+                "/bin/sh",
+                "-c",
+                command,
+            ],
+            env={},
+            timeout=timeout,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        return (cp.returncode, cp.stdout)
+
+    def start(self, interactive: bool = False) -> None:
+        stdin = None if interactive else subprocess.PIPE
+        stdout = None if interactive else subprocess.PIPE
+        self.process = subprocess.Popen(
+            [self.start_command],
+            stdin=stdin,
+            stdout=stdout,
+        )
+
+        self.pid = self.process.pid
+
+        self.log(f"system-nspawn running (pid {self.pid})")
+
+    def wait_for_shutdown(self) -> None:
+        raise NotImplementedError()

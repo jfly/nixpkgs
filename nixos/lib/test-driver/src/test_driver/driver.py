@@ -1,6 +1,7 @@
 import os
 import re
 import signal
+import subprocess
 import sys
 import tempfile
 import threading
@@ -16,7 +17,12 @@ from colorama import Style
 from test_driver.debug import DebugAbstract, DebugNop
 from test_driver.errors import MachineError, RequestedAssertionFailed
 from test_driver.logger import AbstractLogger
-from test_driver.machine import Machine, NixStartScript, retry
+from test_driver.machine import (
+    BaseMachine,
+    NspawnMachine,
+    QemuMachine,
+    retry,
+)
 from test_driver.polling_condition import PollingCondition
 from test_driver.vlan import VLan
 
@@ -63,7 +69,8 @@ class Driver:
 
     tests: str
     vlans: list[VLan]
-    machines: list[Machine]
+    vm_machines: list[QemuMachine]
+    container_machines: list[NspawnMachine]
     polling_conditions: list[PollingCondition]
     global_timeout: int
     race_timer: threading.Timer
@@ -72,7 +79,8 @@ class Driver:
 
     def __init__(
         self,
-        start_scripts: list[str],
+        vm_start_scripts: list[str],
+        container_start_scripts: list[str],
         vlans: list[int],
         tests: str,
         out_dir: Path,
@@ -94,24 +102,60 @@ class Driver:
             vlans = list(set(vlans))
             self.vlans = [VLan(nr, tmp_dir, self.logger) for nr in vlans]
 
-        def cmd(scripts: list[str]) -> Iterator[NixStartScript]:
-            for s in scripts:
-                yield NixStartScript(s)
-
         self.polling_conditions = []
 
-        self.machines = [
-            Machine(
-                start_command=cmd,
+        self.vm_machines = [
+            QemuMachine(
+                start_command=vm_start_script,
                 keep_vm_state=keep_vm_state,
-                name=cmd.machine_name,
                 tmp_dir=tmp_dir,
                 callbacks=[self.check_polling_conditions],
                 out_dir=self.out_dir,
                 logger=self.logger,
             )
-            for cmd in cmd(start_scripts)
+            for vm_start_script in vm_start_scripts
         ]
+
+        if len(container_start_scripts) > 0:
+            self._init_nspawn_environment()
+
+        self.container_machines = [
+            NspawnMachine(
+                start_command=container_start_script,
+                tmp_dir=tmp_dir,
+                logger=self.logger,
+                # <<< keep_vm_state=keep_vm_state,
+                # <<< name=cmd.machine_name,
+                # <<< callbacks=[self.check_polling_conditions],
+                # <<< out_dir=self.out_dir,
+            )
+            for container_start_script in container_start_scripts
+        ]
+
+    def _init_nspawn_environment(self) -> None:
+        assert os.geteuid() == 0, (
+            f"systemd-nspawn requires root to work. You are {os.geteuid()}"
+        )
+        in_build_sandbox = "out" in os.environ  # <<< TODO: get rid of this hack >>>
+        if in_build_sandbox:
+            Path("/run").mkdir(parents=True, exist_ok=True)
+            subprocess.run(["mount", "-t", "tmpfs", "none", "/run"], check=True)
+            Path("/run/netns").mkdir(parents=True, exist_ok=True)
+
+            Path("/var").mkdir(parents=True, exist_ok=True)
+            subprocess.run(["ln", "-s", "/run", "/var/run"], check=True)
+
+            subprocess.run(
+                ["mount", "-t", "cgroup2", "none", "/sys/fs/cgroup"], check=True
+            )
+            subprocess.run(["touch", "/etc/os-release"], check=True)
+            subprocess.run(
+                ["systemd-machine-id-setup"], check=True
+            )  # set up /etc/machine-id
+
+    @property
+    def machines(self) -> list[QemuMachine | NspawnMachine]:
+        return self.vm_machines + self.container_machines
 
     def __enter__(self) -> "Driver":
         return self
@@ -148,7 +192,8 @@ class Driver:
         general_symbols = dict(
             start_all=self.start_all,
             test_script=self.test_script,
-            machines=self.machines,
+            vm_machines=self.vm_machines,
+            container_machines=self.container_machines,
             vlans=self.vlans,
             driver=self,
             log=self.logger,
@@ -161,7 +206,7 @@ class Driver:
             serial_stdout_off=self.serial_stdout_off,
             serial_stdout_on=self.serial_stdout_on,
             polling_condition=self.polling_condition,
-            Machine=Machine,  # for typing
+            BaseMachine=BaseMachine,  # for typing
             t=AssertionTester(),
             debug=self.debug,
         )
@@ -280,16 +325,13 @@ class Driver:
         *,
         name: str | None = None,
         keep_vm_state: bool = False,
-    ) -> Machine:
+    ) -> BaseMachine:
         tmp_dir = get_tmp_dir()
 
-        cmd = NixStartScript(start_command)
-        name = name or cmd.machine_name
-
-        return Machine(
+        return QemuMachine(
             tmp_dir=tmp_dir,
             out_dir=self.out_dir,
-            start_command=cmd,
+            start_command=start_command,
             name=name,
             keep_vm_state=keep_vm_state,
             logger=self.logger,
