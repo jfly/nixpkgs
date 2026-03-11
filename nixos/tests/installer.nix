@@ -9,7 +9,61 @@ with import ../lib/testing-python.nix { inherit system pkgs; };
 with pkgs.lib;
 
 let
-
+  key1 = pkgs.writeTextFile {
+    name = "key1";
+    text = ''
+      -----BEGIN OPENSSH PRIVATE KEY-----
+      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
+      -----END OPENSSH PRIVATE KEY-----
+    '';
+  };
+  key2 = pkgs.writeTextFile {
+    name = "key2";
+    text = ''
+      -----BEGIN OPENSSH PRIVATE KEY-----
+      b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+      QyNTUxOQAAACCmljyHuSKAByZMfZh36hzyj33XHf1gKzy95yOjQ8s44gAAAJgNzMnlDczJ
+      5QAAAAtzc2gtZWQyNTUxOQAAACCmljyHuSKAByZMfZh36hzyj33XHf1gKzy95yOjQ8s44g
+      AAAEBHt6RFSxzaCvaHhYHQNBVRF/FUe+XD7Wfw9GDj5dkQhqaWPIe5IoAHJkx9mHfqHPKP
+      fdcd/WArPL3nI6NDyzjiAAAADmplcmVteUBwYXR0ZXJuAQIDBAUGBw==
+      -----END OPENSSH PRIVATE KEY-----
+    '';
+  };
   # The configuration to install.
   makeConfig =
     {
@@ -71,6 +125,19 @@ let
 
         ${optionalString clevisTest ''
           boot.kernelParams = [ "console=tty0" "ip=192.168.1.1:::255.255.255.0::eth1:none" ];
+          boot.initrd.systemd.emergencyAccess = true;  #<<<
+          boot.initrd.network.ssh = {
+            enable = true;
+            port = 22;
+            authorizedKeys = [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP6/gnHOMqLH8uB4B6rVTggpIh4IJnRoBuO4xirUmAuK jeremy@pattern"
+            ];
+            hostKeys =
+                [
+                  "/etc/key1"
+                  "/etc/key2"
+                ];
+          };  #<<<
           boot.initrd = {
             availableKernelModules = [ "tpm_tis" ];
             clevis = { enable = true; useTang = true; };
@@ -180,6 +247,8 @@ let
       with subtest("Create the NixOS configuration"):
           installer.succeed("nixos-generate-config ${optionalString disableFileSystems "--no-filesystems"} --root /mnt")
           installer.succeed("cat /mnt/etc/nixos/hardware-configuration.nix >&2")
+          installer.copy_from_host("${key1}", "/mnt/etc/key1") #<<<
+          installer.copy_from_host("${key2}", "/mnt/etc/key2") #<<<
           installer.copy_from_host(
               "${
                 makeConfig {
@@ -239,383 +308,6 @@ let
 
       # Now see if we can boot the installation.
       ${startTarget}
-
-      with subtest("Assert that /boot get mounted"):
-          target.wait_for_unit("local-fs.target")
-          ${
-            if bootLoader == "grub" then
-              ''target.succeed("test -e /boot/grub")''
-            else
-              ''target.succeed("test -e /boot/loader/loader.conf")''
-          }
-
-      with subtest("Check whether /root has correct permissions"):
-          assert "700" in target.succeed("stat -c '%a' /root")
-
-      with subtest("Assert swap device got activated"):
-          # uncomment once https://bugs.freedesktop.org/show_bug.cgi?id=86930 is resolved
-          target.wait_for_unit("swap.target")
-          target.succeed("cat /proc/swaps | grep -q /dev")
-
-      with subtest("Check that the store is in good shape"):
-          target.succeed("nix-store --verify --check-contents >&2")
-
-      with subtest("Check whether the channel works"):
-          target.succeed("nix-env -iA nixos.procps >&2")
-          assert ".nix-profile" in target.succeed("type -tP ps | tee /dev/stderr")
-
-      with subtest(
-          "Check that the daemon works, and that non-root users can run builds "
-          "(this will build a new profile generation through the daemon)"
-      ):
-          target.succeed("su alice -l -c 'nix-env -iA nixos.procps' >&2")
-
-      with subtest("Configure system with writable Nix store on next boot"):
-          # we're not using copy_from_host here because the installer image
-          # doesn't know about the host-guest sharing mechanism.
-          target.copy_from_host_via_shell(
-              "${
-                makeConfig {
-                  inherit
-                    bootLoader
-                    grubDevice
-                    grubIdentifier
-                    grubUseEfi
-                    extraConfig
-                    clevisTest
-                    ;
-                  forceGrubReinstallCount = 1;
-                }
-              }",
-              "/etc/nixos/configuration.nix",
-          )
-
-      with subtest("Check whether nixos-rebuild works"):
-          target.succeed("nixos-rebuild switch >&2")
-
-      with subtest("Test nixos-option"):
-          kernel_modules = target.succeed("nixos-option boot.initrd.kernelModules")
-          assert "virtio_console" in kernel_modules
-          assert "list of modules" in kernel_modules
-          assert "qemu-guest.nix" in kernel_modules
-
-      target.shutdown()
-
-      # Check whether a writable store build works
-      ${startTarget}
-
-      # we're not using copy_from_host here because the installer image
-      # doesn't know about the host-guest sharing mechanism.
-      target.copy_from_host_via_shell(
-          "${
-            makeConfig {
-              inherit
-                bootLoader
-                grubDevice
-                grubIdentifier
-                grubUseEfi
-                extraConfig
-                clevisTest
-                ;
-              forceGrubReinstallCount = 2;
-            }
-          }",
-          "/etc/nixos/configuration.nix",
-      )
-      target.succeed("nixos-rebuild boot >&2")
-      target.shutdown()
-
-      # And just to be sure, check that the target still boots after "nixos-rebuild switch".
-      ${startTarget}
-      target.wait_for_unit("network.target")
-
-      # Sanity check, is it the configuration.nix we generated?
-      hostname = target.succeed("hostname").strip()
-      assert hostname == "thatworked"
-
-      target.shutdown()
-
-      # Tests for validating clone configuration entries in grub menu
-    ''
-    + optionalString testSpecialisationConfig ''
-      # Reboot target
-      ${startTarget}
-
-      with subtest("Booted configuration name should be 'Home'"):
-          # This is not the name that shows in the grub menu.
-          # The default configuration is always shown as "Default"
-          target.succeed("cat /run/booted-system/configuration-name >&2")
-          assert "Home" in target.succeed("cat /run/booted-system/configuration-name")
-
-      with subtest("We should **not** find a file named /etc/gitconfig"):
-          target.fail("test -e /etc/gitconfig")
-
-      with subtest("Set grub to boot the second configuration"):
-          target.succeed("grub-reboot 1")
-
-      target.shutdown()
-
-      # Reboot target
-      ${startTarget}
-
-      with subtest("Booted configuration name should be Work"):
-          target.succeed("cat /run/booted-system/configuration-name >&2")
-          assert "Work" in target.succeed("cat /run/booted-system/configuration-name")
-
-      with subtest("We should find a file named /etc/gitconfig"):
-          target.succeed("test -e /etc/gitconfig")
-
-      target.shutdown()
-    ''
-    + optionalString testByAttrSwitch ''
-      with subtest("Configure system with attribute set"):
-        target.succeed("""
-          mkdir /root/my-config
-          mv /etc/nixos/hardware-configuration.nix /root/my-config/
-          rm /etc/nixos/configuration.nix
-        """)
-        target.copy_from_host_via_shell(
-          "${
-            makeConfig {
-              inherit
-                bootLoader
-                grubDevice
-                grubIdentifier
-                grubUseEfi
-                extraConfig
-                clevisTest
-                ;
-              forceGrubReinstallCount = 1;
-              withTestInstrumentation = false;
-            }
-          }",
-          "/root/my-config/configuration.nix",
-        )
-        target.copy_from_host_via_shell(
-          "${./installer/byAttrWithChannel.nix}",
-          "/root/my-config/default.nix",
-        )
-      with subtest("Switch to attribute set based config with channels"):
-        target.succeed("nixos-rebuild switch --file /root/my-config/default.nix")
-
-      target.shutdown()
-
-      ${startTarget}
-
-      target.succeed("""
-        rm /root/my-config/default.nix
-      """)
-      target.copy_from_host_via_shell(
-        "${./installer/byAttrNoChannel.nix}",
-        "/root/my-config/default.nix",
-      )
-
-      target.succeed("""
-        pkgs=$(readlink -f /nix/var/nix/profiles/per-user/root/channels)/nixos
-        if ! [[ -e $pkgs/pkgs/top-level/default.nix ]]; then
-          echo 1>&2 "$pkgs does not seem to be a nixpkgs source. Please fix the test so that pkgs points to a nixpkgs source.";
-          exit 1;
-        fi
-        sed -e s^@nixpkgs@^$pkgs^ -i /root/my-config/default.nix
-
-      """)
-
-      with subtest("Switch to attribute set based config without channels"):
-        target.succeed("nixos-rebuild switch --file /root/my-config/default.nix")
-
-      target.shutdown()
-
-      ${startTarget}
-
-      with subtest("nix-channel command is not available anymore"):
-        target.succeed("! which nix-channel")
-
-      with subtest("builtins.nixPath is now empty"):
-        target.succeed("""
-          [[ "[ ]" == "$(nix-instantiate builtins.nixPath --eval --expr)" ]]
-        """)
-
-      with subtest("<nixpkgs> does not resolve"):
-        target.succeed("""
-          ! nix-instantiate '<nixpkgs>' --eval --expr
-        """)
-
-      with subtest("Evaluate attribute set based config in fresh env without nix-channel"):
-        target.succeed("nixos-rebuild switch --file /root/my-config/default.nix")
-
-      with subtest("Evaluate attribute set based config in fresh env without channel profiles"):
-        target.succeed("""
-          (
-            exec 1>&2
-            mkdir -p /root/restore
-            mv -v /root/.nix-channels /root/restore/
-            mv -v ~/.nix-defexpr /root/restore/
-            mkdir -p /root/restore/channels
-            mv -v /nix/var/nix/profiles/per-user/root/channels* /root/restore/channels/
-          )
-        """)
-        target.succeed("nixos-rebuild switch --file /root/my-config/default.nix")
-    ''
-    + optionalString (testByAttrSwitch && testFlakeSwitch) ''
-      with subtest("Restore channel profiles"):
-        target.succeed("""
-          (
-            exec 1>&2
-            mv -v /root/restore/.nix-channels /root/
-            mv -v /root/restore/.nix-defexpr ~/.nix-defexpr
-            mv -v /root/restore/channels/* /nix/var/nix/profiles/per-user/root/
-            rm -vrf /root/restore
-          )
-        """)
-
-      with subtest("Restore /etc/nixos"):
-        target.succeed("""
-          mv -v /root/my-config/hardware-configuration.nix /etc/nixos/
-        """)
-        target.copy_from_host_via_shell(
-          "${
-            makeConfig {
-              inherit
-                bootLoader
-                grubDevice
-                grubIdentifier
-                grubUseEfi
-                extraConfig
-                clevisTest
-                ;
-              forceGrubReinstallCount = 1;
-            }
-          }",
-          "/etc/nixos/configuration.nix",
-        )
-
-      with subtest("Restore /root/my-config"):
-        target.succeed("""
-          rm -vrf /root/my-config
-        """)
-
-    ''
-    + optionalString (testByAttrSwitch && !testFlakeSwitch) ''
-      target.shutdown()
-    ''
-    + optionalString testFlakeSwitch ''
-      ${startTarget}
-
-      with subtest("Configure system with flake"):
-        # TODO: evaluate as user?
-        target.succeed("""
-          mkdir /root/my-config
-          mv /etc/nixos/hardware-configuration.nix /root/my-config/
-          rm /etc/nixos/configuration.nix
-        """)
-        target.copy_from_host_via_shell(
-          "${
-            makeConfig {
-              inherit
-                bootLoader
-                grubDevice
-                grubIdentifier
-                grubUseEfi
-                extraConfig
-                clevisTest
-                ;
-              forceGrubReinstallCount = 1;
-              withTestInstrumentation = false;
-            }
-          }",
-          "/root/my-config/configuration.nix",
-        )
-        target.copy_from_host_via_shell(
-          "${./installer/flake.nix}",
-          "/root/my-config/flake.nix",
-        )
-        target.succeed("""
-          # for some reason the image does not have `pkgs.path`, so
-          # we use readlink to find a Nixpkgs source.
-          pkgs=$(readlink -f /nix/var/nix/profiles/per-user/root/channels)/nixos
-          if ! [[ -e $pkgs/pkgs/top-level/default.nix ]]; then
-            echo 1>&2 "$pkgs does not seem to be a nixpkgs source. Please fix the test so that pkgs points to a nixpkgs source.";
-            exit 1;
-          fi
-          sed -e s^@nixpkgs@^$pkgs^ -i /root/my-config/flake.nix
-        """)
-
-      with subtest("Switch to flake based config"):
-        target.succeed("nixos-rebuild switch --flake /root/my-config#xyz 2>&1 | tee activation-log >&2")
-
-        target.succeed("""
-          cat -n activation-log >&2
-        """)
-
-        target.succeed("""
-          grep -F '/root/.nix-defexpr/channels exists, but channels have been disabled.' activation-log
-        """)
-        target.succeed("""
-          grep -F '/nix/var/nix/profiles/per-user/root/channels exists, but channels have been disabled.' activation-log
-        """)
-        target.succeed("""
-          grep -F '/root/.nix-defexpr/channels exists, but channels have been disabled.' activation-log
-        """)
-        target.succeed("""
-          grep -F 'Due to https://github.com/NixOS/nix/issues/9574, Nix may still use these channels when NIX_PATH is unset.' activation-log
-        """)
-        target.succeed("rm activation-log")
-
-        # Perform the suggested cleanups we've just seen in the log
-        # TODO after https://github.com/NixOS/nix/issues/9574: don't remove them yet
-        target.succeed("""
-          rm -rf /root/.nix-defexpr/channels /nix/var/nix/profiles/per-user/root/channels /root/.nix-defexpr/channels
-        """)
-
-
-      target.shutdown()
-
-      ${startTarget}
-
-      with subtest("nix-channel command is not available anymore"):
-        target.succeed("! which nix-channel")
-
-      # Note that the channel profile is still present on disk, but configured
-      # not to be used.
-      # TODO after issue https://github.com/NixOS/nix/issues/9574: re-enable this assertion
-      # I believe what happens is
-      #   - because of the issue, we've removed the `nix-path =` line from nix.conf
-      #   - the "backdoor" shell is not a proper session and does not have `NIX_PATH=""` set
-      #   - seeing no nix path settings at all, Nix loads its hardcoded default value,
-      #     which is unfortunately non-empty
-      # Or maybe it's the new default NIX_PATH?? :(
-      # with subtest("builtins.nixPath is now empty"):
-      #   target.succeed("""
-      #     (
-      #       set -x;
-      #       [[ "[ ]" == "$(nix-instantiate builtins.nixPath --eval --expr)" ]];
-      #     )
-      #   """)
-
-      with subtest("<nixpkgs> does not resolve"):
-        target.succeed("""
-          ! nix-instantiate '<nixpkgs>' --eval --expr
-        """)
-
-      with subtest("Evaluate flake config in fresh env without nix-channel"):
-        target.succeed("nixos-rebuild switch --flake /root/my-config#xyz")
-
-      with subtest("Evaluate flake config in fresh env without channel profiles"):
-        target.succeed("""
-          (
-            exec 1>&2
-            rm -vf /root/.nix-channels
-            rm -vrf ~/.nix-defexpr
-            rm -vrf /nix/var/nix/profiles/per-user/root/channels*
-          )
-        """)
-        target.succeed("nixos-rebuild switch --flake /root/my-config#xyz | tee activation-log >&2")
-        target.succeed("cat -n activation-log >&2")
-        target.succeed("! grep -F '/root/.nix-defexpr/channels' activation-log")
-        target.succeed("! grep -F 'but channels have been disabled' activation-log")
-        target.succeed("! grep -F 'https://github.com/NixOS/nix/issues/9574' activation-log")
-
-      target.shutdown()
     '';
 
   makeInstallerTest =
@@ -795,6 +487,24 @@ let
         }
         // optionalAttrs clevisTest {
           tang = {
+            services.getty.helpLine =
+              let
+                key = pkgs.writeTextFile {
+                  name = "id_rsa";
+                  text = ''
+                    -----BEGIN OPENSSH PRIVATE KEY-----
+                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                    QyNTUxOQAAACD+v4JxzjKix/LgeAeq1U4IKSIeCCZ0aAbjuMYq1JgLigAAAJiQd8/ukHfP
+                    7gAAAAtzc2gtZWQyNTUxOQAAACD+v4JxzjKix/LgeAeq1U4IKSIeCCZ0aAbjuMYq1JgLig
+                    AAAEBWuUFW5rIszXYpnrHtUP0M6irhG/VSApqDrSJYSiaDgv6/gnHOMqLH8uB4B6rVTggp
+                    Ih4IJnRoBuO4xirUmAuKAAAADmplcmVteUBwYXR0ZXJuAQIDBAUGBw==
+                    -----END OPENSSH PRIVATE KEY-----
+                  '';
+                };
+              in
+              ''
+                Hi! Check out ${key}
+              '';
             services.tang = {
               enable = true;
               listenStream = [ "80" ];
