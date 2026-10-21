@@ -23,6 +23,11 @@ rustPlatform.buildRustPackage (finalAttrs: {
     hash = "sha256-4dT01SgTPwo9Vw7WIKtdRVP5+dd45YsTPOuf3V6SJg8=";
   };
 
+  patches = [
+    # https://cyberchaos.dev/yuka/yarn-berry-fetcher/-/merge_requests/29
+    ./use-correct-package-name.patch
+  ];
+
   cargoHash = "sha256-l8zTzr2y8i2ENb8iadIBz59YLmNwfDZcrbUqIUibFqg=";
 
   env.YARN_ZIP_SUPPORTED_CACHE_VERSION = berryCacheVersion;

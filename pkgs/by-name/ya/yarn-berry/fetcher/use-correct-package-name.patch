@@ -1,0 +1,28 @@
+commit 675806e36223610b1d0ea9f0d52bf64816f6859d
+Author:     Jeremy Fleischman <me@jfly.fyi>
+AuthorDate: Wed Oct 21 11:06:10 2026 -0500
+Commit:     Jeremy Fleischman <me@jfly.fyi>
+CommitDate: Wed Oct 21 11:21:45 2026 -0500
+
+    Use correct package name in `yarn-berry-fetcher missing-hashes`
+    
+    This is for consistency with both [`yarn-berry-fetcher
+    fetch`](https://cyberchaos.dev/yuka/yarn-berry-fetcher/-/blob/1.3.1/src/cache/fetch.rs#L124-129) and `yarn`
+    itself.
+    
+    This fixes
+    https://cyberchaos.dev/yuka/yarn-berry-fetcher/-/work_items/4.
+
+diff --git a/src/missing_hashes.rs b/src/missing_hashes.rs
+index 00400f2..fd5eed2 100644
+--- a/src/missing_hashes.rs
++++ b/src/missing_hashes.rs
+@@ -40,7 +40,7 @@ pub async fn get_missing_hashes(
+         // so we create a TempDir and pass it out.zip in that.
+         let zip_path = zip_dir.dir_path().join("out.zip");
+ 
+-        let integrity = write_zip_and_calc_integrity(f, zip_path, compression, entry.name)
++        let integrity = write_zip_and_calc_integrity(f, zip_path, compression, entry.name())
+             .await
+             .context("calculating integrity")?;
+ 

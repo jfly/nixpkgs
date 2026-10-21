@@ -5,6 +5,7 @@
   makeWrapper,
   nixosTests,
   nodejs_26,
+  nix-update-script,
   postgresql,
   stdenv,
   yarn-berry_4,
@@ -48,10 +49,7 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   passthru = {
-    # Blocked on:
-    # - Unreleased change to nix-update: <https://github.com/Mic92/nix-update/pull/640#issuecomment-6298951201>
-    # - Unmerged fix to yarn-berry-fetcher: <https://cyberchaos.dev/yuka/yarn-berry-fetcher/-/merge_requests/29>
-    # updateScript = nix-update-script { };
+    updateScript = nix-update-script { };
 
     tests = { inherit (nixosTests) twenty; };
   };
