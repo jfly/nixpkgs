@@ -1,12 +1,14 @@
 {
   lib,
   callPackage,
+  fetchpatch,
   fetchFromGitHub,
   nix,
   nix-prefetch-git,
   nixpkgs-review,
   python3Packages,
   nix-update,
+  yarn-berry,
 }:
 
 python3Packages.buildPythonApplication (finalAttrs: {
@@ -21,6 +23,15 @@ python3Packages.buildPythonApplication (finalAttrs: {
     hash = "sha256-LT66e5NtAJRp0E8QXKeePdTCNpH+CMvJNF1ayzBr4rw=";
   };
 
+  patches = [
+    (fetchpatch {
+      name = "Support updating Yarn Berry `missingHashes`";
+      url = "https://github.com/Mic92/nix-update/commit/5cb9a539646650d52d06f34cff088099f1030246.diff";
+      excludes = [ "README.md" ];
+      hash = "sha256-/1YxyD4APSj/4Q1g52vX7XdUj+HgsODZvJqQi+xvc6Y=";
+    })
+  ];
+
   build-system = [ python3Packages.setuptools ];
 
   makeWrapperArgs = [
@@ -31,6 +42,7 @@ python3Packages.buildPythonApplication (finalAttrs: {
       nix
       nix-prefetch-git
       nixpkgs-review
+      yarn-berry.yarn-berry-fetcher
     ])
   ];
 
