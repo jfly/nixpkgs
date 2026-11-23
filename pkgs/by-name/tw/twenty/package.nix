@@ -16,7 +16,7 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "twenty";
-  version = "2.60.0";
+  version = "2.62.0";
 
   __structuredAttrs = true;
   strictDeps = true;
@@ -25,7 +25,7 @@ stdenv.mkDerivation (finalAttrs: {
     owner = "twentyhq";
     repo = "twenty";
     tag = "twenty/v${finalAttrs.version}";
-    hash = "sha256-Ek50nLLoz1jTAZRksZXsf7Pcs+F7Ae+MbBmEcT9ppjc=";
+    hash = "sha256-XiX6grfzwj6FMdDPb9UnSyHXaYZko8FHylDLkfN4bYU=";
   };
 
   postPatch = ''
@@ -60,7 +60,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   offlineCache = yarn-berry.fetchYarnBerryDeps {
     inherit (finalAttrs) src missingHashes;
-    hash = "sha256-t0HcxyvmLtWSGb/ECIyniVCWsd5G3sRHGcERfmBQEuM=";
+    hash = "sha256-Yapq4leJ5H/krxFTjEsS/iHuJptcgSySKwAPOS71fyA=";
   };
 
   preBuild = ''
